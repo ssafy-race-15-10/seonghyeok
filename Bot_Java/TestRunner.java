@@ -2,6 +2,7 @@ public class TestRunner {
     public static void main(String[] args) {
         testTrackParams();
         testTrackDetection();
+        testSteering();
         System.out.println("TestRunner ready. Add test calls here.");
     }
 
@@ -35,6 +36,41 @@ public class TestRunner {
         assertTrue(germany.brakeRange == 30f,      "GERMANY brakeRange");
 
         System.out.println("PASS: TrackParams");
+    }
+
+    static void testSteering() {
+        MyCar.TrackParams p = MyCar.PARAMS[MyCar.TRACK_BASIC];
+
+        // Straight road, centered, aligned → near-zero steering
+        float[] straight = new float[20];
+        float s1 = MyCar.computeSteering(0f, 9.25f, 0f, straight, p);
+        assertTrue(Math.abs(s1) < 0.05f,
+                   "Centered car on straight should steer ~0, got: " + s1);
+        System.out.println("  straight+centered: " + s1);
+
+        // Car to the right of center → should steer left (negative)
+        float s2 = MyCar.computeSteering(5f, 9.25f, 0f, straight, p);
+        assertTrue(s2 < 0,
+                   "Car right of center should steer left (negative), got: " + s2);
+        System.out.println("  right of center:   " + s2);
+
+        // Right curve ahead → should steer right (positive)
+        float[] rightCurve = new float[20];
+        for (int i = 0; i < 5; i++) rightCurve[i] = 30f;
+        float s3 = MyCar.computeSteering(0f, 9.25f, 0f, rightCurve, p);
+        assertTrue(s3 > 0,
+                   "Right curve ahead should steer right (positive), got: " + s3);
+        System.out.println("  right curve ahead: " + s3);
+
+        // All three signals maxed left → raw = K1*(-1)+K2*(-1)+K3*(-1) = -1.0 → clamp holds
+        float[] leftCurve90 = new float[20];
+        for (int i = 0; i < 5; i++) leftCurve90[i] = -90f;
+        float s4 = MyCar.computeSteering(9.25f, 9.25f, 90f, leftCurve90, p);
+        assertTrue(Math.abs(s4 - (-1.0f)) < 0.001f,
+                   "All signals maxed left should yield -1.0, got: " + s4);
+        System.out.println("  all-left maxed (clamped): " + s4);
+
+        System.out.println("PASS: steering");
     }
 
     static void testTrackDetection() {

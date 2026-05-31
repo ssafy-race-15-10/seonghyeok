@@ -47,6 +47,37 @@ public class MyCar {
         new TrackParams(100, 25, 1.2f,  8, 10, 0.5f, 0.6f, 0.4f, 0.5f, 20, 30)
     };
 
+    // --- Steering helpers ---
+    static float computeLookaheadAngle(float[] angles, TrackParams p) {
+        double wSum = 0, aSum = 0;
+        int n = Math.min(p.steerLookAhead, angles.length);
+        for (int i = 0; i < n; i++) {
+            double w = Math.exp(-i * p.decayFactor);
+            aSum += angles[i] * w;
+            wSum += w;
+        }
+        return wSum == 0 ? 0f : (float) (aSum / wSum / 90.0);
+    }
+
+    static float computeSteering(float toMiddle, float halfRoadLimit,
+                                  float movingAngle, float[] angles, TrackParams p) {
+        float centerError    = -(toMiddle / halfRoadLimit);
+        float angleError     = -(movingAngle / 90.0f);
+        float lookaheadAngle = computeLookaheadAngle(angles, p);
+        float raw = p.K1 * centerError + p.K2 * angleError + p.K3 * lookaheadAngle;
+        return clamp(raw, -1.0f, 1.0f);
+    }
+
+    static float clamp(float v, float min, float max) {
+        return Math.max(min, Math.min(max, v));
+    }
+
+    static float[] toFloatArray(java.util.ArrayList<Float> list) {
+        float[] arr = new float[list.size()];
+        for (int i = 0; i < list.size(); i++) arr[i] = list.get(i);
+        return arr;
+    }
+
     // --- Track detection helper ---
     static int detectTrackType(float halfRoadLimit) {
         if (halfRoadLimit > 11.0f) return TRACK_SSAFY;
