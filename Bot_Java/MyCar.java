@@ -262,7 +262,7 @@ public class MyCar {
                 logEvent(String.format("# REVERSE DONE at progress=%.1f", sensing_info.lap_progress));
             }
         } else {
-            if (isStuck(sensing_info.speed, car_controls.throttle)) {
+            if (sensing_info.lap_progress > 1f && isStuck(sensing_info.speed, car_controls.throttle)) {
                 stuckTicks++;
                 if (stuckTicks == 5) {
                     reverseTicks = 20;
