@@ -253,9 +253,18 @@ public class MyCar {
 
     static {
         try {
-            System.load(new File("DrivingInterface/DrivingInterface.dll").getAbsolutePath());
+            File dll = new File("DrivingInterface/DrivingInterface.dll");
+            System.out.println("[DLL] Working dir : " + new File(".").getAbsolutePath());
+            System.out.println("[DLL] DLL path    : " + dll.getAbsolutePath());
+            System.out.println("[DLL] DLL exists  : " + dll.exists());
+            if (dll.exists()) {
+                System.load(dll.getAbsolutePath());
+                System.out.println("[DLL] Loaded OK");
+            } else {
+                System.out.println("[DLL] File not found — test mode");
+            }
         } catch (UnsatisfiedLinkError e) {
-            System.out.println("[MyCar] Test mode: native library not loaded");
+            System.out.println("[DLL] Load failed : " + e.getMessage());
         }
     }
 
