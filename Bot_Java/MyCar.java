@@ -72,6 +72,27 @@ public class MyCar {
         return Math.max(min, Math.min(max, v));
     }
 
+    static float computeTargetSpeed(float[] angles, TrackParams p) {
+        float maxCurve = 0;
+        int n = Math.min(p.speedLookAhead, angles.length);
+        for (int i = 0; i < n; i++) {
+            maxCurve = Math.max(maxCurve, Math.abs(angles[i]));
+        }
+        return clamp(p.maxSpeed - p.slowdownFactor * maxCurve, p.minSpeed, p.maxSpeed);
+    }
+
+    static void applySpeedControl(float currentSpeed, float[] angles, TrackParams p) {
+        float targetSpeed = computeTargetSpeed(angles, p);
+        float diff = targetSpeed - currentSpeed;
+        if (diff > 0) {
+            car_controls.throttle = Math.min(1.0f, diff / p.accelerationRange);
+            car_controls.brake    = 0f;
+        } else {
+            car_controls.throttle = 0f;
+            car_controls.brake    = Math.min(1.0f, -diff / p.brakeRange);
+        }
+    }
+
     static float[] toFloatArray(java.util.ArrayList<Float> list) {
         float[] arr = new float[list.size()];
         for (int i = 0; i < list.size(); i++) arr[i] = list.get(i);

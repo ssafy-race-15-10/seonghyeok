@@ -3,6 +3,7 @@ public class TestRunner {
         testTrackParams();
         testTrackDetection();
         testSteering();
+        testSpeed();
         System.out.println("TestRunner ready. Add test calls here.");
     }
 
@@ -85,6 +86,35 @@ public class TestRunner {
         assertTrue(MyCar.detectTrackType(11.1f) == MyCar.TRACK_SSAFY,
                    "half_road_limit 11.1 should be SSAFY");
         System.out.println("PASS: track detection");
+    }
+
+    static void testSpeed() {
+        MyCar.TrackParams p = MyCar.PARAMS[MyCar.TRACK_BASIC];
+
+        // Straight road → target equals maxSpeed
+        float[] straight = new float[20];
+        float t1 = MyCar.computeTargetSpeed(straight, p);
+        assertTrue(t1 == 130f,
+                   "Straight road target should be maxSpeed (130), got: " + t1);
+        System.out.println("  straight target speed: " + t1);
+
+        // Sharp curve (angle=60) → reduced speed
+        float[] sharp = new float[20];
+        sharp[0] = 60f;
+        float t2 = MyCar.computeTargetSpeed(sharp, p);
+        assertTrue(t2 < 100f,
+                   "Sharp curve should reduce speed below 100, got: " + t2);
+        System.out.println("  sharp curve target:    " + t2);
+
+        // Extreme curve → clamped to minSpeed
+        float[] extreme = new float[20];
+        for (int i = 0; i < 6; i++) extreme[i] = 120f;
+        float t3 = MyCar.computeTargetSpeed(extreme, p);
+        assertTrue(t3 == 40f,
+                   "Extreme curve should clamp to minSpeed (40), got: " + t3);
+        System.out.println("  extreme curve target:  " + t3);
+
+        System.out.println("PASS: speed control");
     }
 
     static void assertTrue(boolean condition, String message) {
