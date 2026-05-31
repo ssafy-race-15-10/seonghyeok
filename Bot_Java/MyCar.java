@@ -247,6 +247,7 @@ public class MyCar {
         float speedCap    = computeObstacleSpeedCap(sensing_info.track_forward_obstacles, p.maxSpeed);
         float targetSpeed = Math.min(computeTargetSpeed(angles, p), speedCap);
         applySpeedControl(sensing_info.speed, targetSpeed, p);
+        float nearestDist = nearestObstacleDist(sensing_info.track_forward_obstacles);
 
         // StuckDetector
         if (reverseTicks > 0) {
@@ -288,7 +289,10 @@ public class MyCar {
                 new File("logs").mkdirs();
                 String ts = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
                 logWriter = new PrintWriter(new FileWriter("logs/run_" + ts + ".csv"));
-                logWriter.println("tick,lap,progress,speed,to_middle,moving_angle,steering,throttle,brake,collided,elapsed_ms");
+                logWriter.println("tick,lap,progress,speed,to_middle,moving_angle," +
+                                  "steering,throttle,brake,collided," +
+                                  "obs_count,obs_nearest_dist,target_speed," +
+                                  "stuck_ticks,reverse_ticks,elapsed_ms");
                 lapStartTime = System.currentTimeMillis();
             } catch (IOException e) {
                 System.out.println("[LOG] Cannot open log: " + e.getMessage());
@@ -297,13 +301,24 @@ public class MyCar {
         if (logWriter != null) {
             tickCount++;
             long elapsed = System.currentTimeMillis() - lapStartTime;
-            logWriter.printf("%d,%d,%.1f,%.1f,%.3f,%.1f,%.3f,%.3f,%.3f,%b,%d%n",
+            logWriter.printf("%d,%d,%.1f,%.1f,%.3f,%.1f,%.3f,%.3f,%.3f,%b,%d,%.1f,%.1f,%d,%d,%d%n",
                 tickCount, lapCount + 1,
                 sensing_info.lap_progress, sensing_info.speed,
                 sensing_info.to_middle, sensing_info.moving_angle,
                 car_controls.steering, car_controls.throttle, car_controls.brake,
-                sensing_info.collided, elapsed);
+                sensing_info.collided,
+                sensing_info.track_forward_obstacles.size(),
+                nearestDist,
+                targetSpeed,
+                stuckTicks, reverseTicks,
+                elapsed);
             logWriter.flush();
+            if (nearestDist >= 0f && nearestDist < 15f) {
+                float avoidLogged = computeObstacleAvoidance(sensing_info.track_forward_obstacles,
+                                                             sensing_info.half_road_limit);
+                logEvent(String.format("# OBSTACLE CLOSE: dist=%.1f avoid_steer=%.3f",
+                                       nearestDist, avoidLogged));
+            }
 
             if (lastProgress > 90f && sensing_info.lap_progress < 10f) {
                 lapCount++;
