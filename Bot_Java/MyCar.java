@@ -132,6 +132,17 @@ public class MyCar {
         return maxSpeed * (1.0f - 0.4f * proximity);
     }
 
+    static boolean isStuck(float speed, float throttle) {
+        return speed < 3f && throttle > 0.3f;
+    }
+
+    private void logEvent(String msg) {
+        if (logWriter != null) {
+            logWriter.println(msg);
+            logWriter.flush();
+        }
+    }
+
     // --- Track detection helper ---
     static int detectTrackType(float halfRoadLimit) {
         if (halfRoadLimit > 11.0f) return TRACK_SSAFY;
@@ -142,7 +153,8 @@ public class MyCar {
     // --- State ---
     private boolean trackInitialized = false;
     private int trackType = TRACK_BASIC;
-    private int recoveryTicks = 0;
+    private int stuckTicks   = 0;
+    private int reverseTicks = 0;
 
     // --- Lap logger ---
     private PrintWriter logWriter = null;
@@ -236,12 +248,33 @@ public class MyCar {
         float targetSpeed = Math.min(computeTargetSpeed(angles, p), speedCap);
         applySpeedControl(sensing_info.speed, targetSpeed, p);
 
-        // Collision recovery: brake hard for 20 ticks (~2s) after impact
-        if (sensing_info.collided) recoveryTicks = 20;
-        if (recoveryTicks > 0) {
-            car_controls.throttle = 0.1f;
-            car_controls.brake    = 0.6f;
-            recoveryTicks--;
+        // StuckDetector
+        if (reverseTicks > 0) {
+            car_controls.throttle = -0.5f;
+            car_controls.brake    = 0f;
+            car_controls.steering = clamp(-(sensing_info.to_middle / sensing_info.half_road_limit),
+                                          -1.0f, 1.0f);
+            reverseTicks--;
+            if (reverseTicks == 0) {
+                stuckTicks = 0;
+                System.out.printf("[REVERSE] DONE at progress=%.1f%n", sensing_info.lap_progress);
+                logEvent(String.format("# REVERSE DONE at progress=%.1f", sensing_info.lap_progress));
+            }
+        } else {
+            if (isStuck(sensing_info.speed, car_controls.throttle)) {
+                stuckTicks++;
+                if (stuckTicks == 5) {
+                    reverseTicks = 20;
+                    System.out.printf("[STUCK] progress=%.1f speed=%.1f%n",
+                                      sensing_info.lap_progress, sensing_info.speed);
+                    logEvent(String.format("# STUCK at progress=%.1f speed=%.1f",
+                                          sensing_info.lap_progress, sensing_info.speed));
+                    System.out.printf("[REVERSE] START at progress=%.1f%n", sensing_info.lap_progress);
+                    logEvent(String.format("# REVERSE START at progress=%.1f", sensing_info.lap_progress));
+                }
+            } else {
+                stuckTicks = 0;
+            }
         }
 
         if(is_debug) {

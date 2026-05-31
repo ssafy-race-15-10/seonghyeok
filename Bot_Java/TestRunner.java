@@ -7,6 +7,7 @@ public class TestRunner {
         testSteering();
         testSpeed();
         testObstacleHandler();
+        testStuckDetector();
         System.out.println("TestRunner ready. Add test calls here.");
     }
 
@@ -185,6 +186,20 @@ public class TestRunner {
         assertTrue(a4 > 0f, "Obstacle hard left at 0m: avoidance should be positive (steer right), got: " + a4);
 
         System.out.println("PASS: obstacle avoidance steering");
+    }
+
+    static void testStuckDetector() {
+        // Stuck: speed < 3 AND throttle > 0.3
+        assertTrue(MyCar.isStuck(1f, 0.5f),    "speed=1 throttle=0.5 → stuck");
+        assertTrue(MyCar.isStuck(0f, 1.0f),    "speed=0 throttle=1.0 → stuck");
+        assertTrue(MyCar.isStuck(2.9f, 0.31f), "speed=2.9 throttle=0.31 → stuck");
+
+        // Not stuck
+        assertTrue(!MyCar.isStuck(50f, 0.8f),  "speed=50 throttle=0.8 → not stuck");
+        assertTrue(!MyCar.isStuck(1f, 0.2f),   "speed=1 throttle=0.2 → not stuck");
+        assertTrue(!MyCar.isStuck(3f, 0.5f),   "speed=3.0 throttle=0.5 → boundary, not stuck");
+
+        System.out.println("PASS: stuck detector");
     }
 
     static void assertTrue(boolean condition, String message) {
