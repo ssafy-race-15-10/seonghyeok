@@ -67,12 +67,16 @@ public class MyCar {
     }
 
     static float computeSteering(float toMiddle, float halfRoadLimit,
-                                  float movingAngle, float[] angles, TrackParams p) {
+                                  float movingAngle, float[] angles,
+                                  TrackParams p,
+                                  float prevCenterError, float prevSteering) {
         float centerError    = -(toMiddle / halfRoadLimit);
         float angleError     = -(movingAngle / 90.0f);
         float lookaheadAngle = computeLookaheadAngle(angles, p);
-        float raw = p.K1 * centerError + p.K2 * angleError + p.K3 * lookaheadAngle;
-        return clamp(raw, -1.0f, 1.0f);
+        float dCenter        = centerError - prevCenterError;
+        float raw = p.K1 * centerError + p.K2 * angleError
+                  + p.K3 * lookaheadAngle + p.K4 * dCenter;
+        return clamp(p.alpha * raw + (1f - p.alpha) * prevSteering, -1.0f, 1.0f);
     }
 
     static float clamp(float v, float min, float max) {
@@ -240,7 +244,8 @@ public class MyCar {
             sensing_info.to_middle,
             sensing_info.half_road_limit,
             sensing_info.moving_angle,
-            angles, p
+            angles, p,
+            0f, 0f
         );
 
         // Obstacle avoidance: blend avoidance signal into steering

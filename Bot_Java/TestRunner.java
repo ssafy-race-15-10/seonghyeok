@@ -53,35 +53,73 @@ public class TestRunner {
 
     static void testSteering() {
         MyCar.TrackParams p = MyCar.PARAMS[MyCar.TRACK_BASIC];
-
-        // Straight road, centered, aligned → near-zero steering
         float[] straight = new float[20];
-        float s1 = MyCar.computeSteering(0f, 9.25f, 0f, straight, p);
+
+        // s1: 중앙 정렬, 직선 → 거의 0
+        float s1 = MyCar.computeSteering(0f, 9.25f, 0f, straight, p, 0f, 0f);
         assertTrue(Math.abs(s1) < 0.05f,
                    "Centered car on straight should steer ~0, got: " + s1);
         System.out.println("  straight+centered: " + s1);
 
-        // Car to the right of center → should steer left (negative)
-        float s2 = MyCar.computeSteering(5f, 9.25f, 0f, straight, p);
+        // s2: 오른쪽 이탈 → 음수(왼쪽 보정)
+        float s2 = MyCar.computeSteering(5f, 9.25f, 0f, straight, p, 0f, 0f);
         assertTrue(s2 < 0,
                    "Car right of center should steer left (negative), got: " + s2);
         System.out.println("  right of center:   " + s2);
 
-        // Right curve ahead → should steer right (positive)
+        // s3: 전방 우커브 → 양수
         float[] rightCurve = new float[20];
         for (int i = 0; i < 5; i++) rightCurve[i] = 30f;
-        float s3 = MyCar.computeSteering(0f, 9.25f, 0f, rightCurve, p);
+        float s3 = MyCar.computeSteering(0f, 9.25f, 0f, rightCurve, p, 0f, 0f);
         assertTrue(s3 > 0,
                    "Right curve ahead should steer right (positive), got: " + s3);
         System.out.println("  right curve ahead: " + s3);
 
-        // All three signals maxed left → raw = K1*(-1)+K2*(-1)+K3*(-1) = -1.0 → clamp holds
+        // s4: 모든 신호 최대 좌측 + prevSteering=-1.0 → -1.0 (클램프)
+        // centerError=-1, dCenter=-1-1=-2, raw=-0.45-0.20-0.35+0.25*(-2)=-1.5 → clamp -1
+        // steering=0.4*(-1)+0.6*(-1)=-1.0
         float[] leftCurve90 = new float[20];
         for (int i = 0; i < 5; i++) leftCurve90[i] = -90f;
-        float s4 = MyCar.computeSteering(9.25f, 9.25f, 90f, leftCurve90, p);
+        float s4 = MyCar.computeSteering(9.25f, 9.25f, 90f, leftCurve90, p, 1.0f, -1.0f);
         assertTrue(Math.abs(s4 - (-1.0f)) < 0.001f,
                    "All signals maxed left should yield -1.0, got: " + s4);
         System.out.println("  all-left maxed (clamped): " + s4);
+
+        // EMA smoothing: prevSteering=0 → 출력은 alpha*raw 수준
+        // to_middle=9.25, straight → centerError=-1, dCenter=-1, raw=-0.45-0.25=-0.70
+        // steering=0.4*(-0.70)+0.6*0=-0.28
+        float sEMA0 = MyCar.computeSteering(9.25f, 9.25f, 0f, straight, p, 0f, 0f);
+        assertTrue(Math.abs(sEMA0 - (-0.28f)) < 0.01f,
+                   "EMA from neutral: expected ~-0.28, got: " + sEMA0);
+        System.out.println("  EMA from neutral:  " + sEMA0);
+
+        // EMA smoothing: prevSteering=-0.8 → 더 음수
+        // steering=0.4*(-0.70)+0.6*(-0.8)=-0.28-0.48=-0.76
+        float sEMA1 = MyCar.computeSteering(9.25f, 9.25f, 0f, straight, p, 0f, -0.8f);
+        assertTrue(Math.abs(sEMA1 - (-0.76f)) < 0.01f,
+                   "EMA with prev=-0.8: expected ~-0.76, got: " + sEMA1);
+        assertTrue(sEMA1 < sEMA0,
+                   "EMA: prev steering magnifies output, got sEMA0=" + sEMA0 + " sEMA1=" + sEMA1);
+        System.out.println("  EMA with prev=-0.8: " + sEMA1);
+
+        // D-term: 이탈 속도 빠를수록 보정 강화
+        // prevCenterError=0 → dCenter=-1.0: raw=-0.45-0.25=-0.70, steering=0.4*(-0.70)=-0.28
+        // prevCenterError=-0.5 → dCenter=-0.5: raw=-0.45-0.125=-0.575, steering=0.4*(-0.575)=-0.23
+        float sDterm0 = MyCar.computeSteering(9.25f, 9.25f, 0f, straight, p, 0f, 0f);
+        float sDterm1 = MyCar.computeSteering(9.25f, 9.25f, 0f, straight, p, -0.5f, 0f);
+        assertTrue(sDterm0 < sDterm1,
+                   "D-term more aggressive when dCenter is large: sDterm0=" + sDterm0 + " sDterm1=" + sDterm1);
+        System.out.println("  D-term dCenter=-1.0: " + sDterm0 + "  dCenter=-0.5: " + sDterm1);
+
+        // D-term: 복귀 중이면 오버슈팅 억제
+        // prevCenterError=-1.0, now=0 → dCenter=+1.0
+        // raw=0.25*1.0=0.25, steering=0.4*0.25+0.6*(-0.4)=0.10-0.24=-0.14
+        // 비교: prevCenterError=0, dCenter=0, raw=0, steering=0.4*0+0.6*(-0.4)=-0.24
+        float sDterm2 = MyCar.computeSteering(0f, 9.25f, 0f, straight, p, -1.0f, -0.4f);
+        float sDterm3 = MyCar.computeSteering(0f, 9.25f, 0f, straight, p, 0f, -0.4f);
+        assertTrue(sDterm2 > sDterm3,
+                   "D-term reduces overcorrection when returning: sDterm2=" + sDterm2 + " sDterm3=" + sDterm3);
+        System.out.println("  D-term anti-overshoot: " + sDterm2 + " vs no-D: " + sDterm3);
 
         System.out.println("PASS: steering");
     }
