@@ -15,3 +15,6 @@
 
 # Build output
 Build/
+
+# Simulator binaries (large, Windows-only)
+Simulator/
