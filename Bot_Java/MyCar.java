@@ -157,7 +157,7 @@ public class MyCar {
     private int reverseTicks = 0;
 
     // --- Lap logger ---
-    private PrintWriter logWriter = null;
+    PrintWriter logWriter = null;
     private long lapStartTime = 0;
     private float lastProgress = 0f;
     private int lapCount = 0;
@@ -296,6 +296,7 @@ public class MyCar {
                                   "steering,throttle,brake,collided," +
                                   "obs_count,obs_nearest_dist,target_speed," +
                                   "stuck_ticks,reverse_ticks,elapsed_ms");
+                logWriter.flush();
                 lapStartTime = System.currentTimeMillis();
                 System.out.println("[LOG] Writing to: " + logFile.getAbsolutePath());
             } catch (IOException e) {
@@ -376,6 +377,11 @@ public class MyCar {
 
         car_controls = new MyCar();
         int return_code = car_controls.StartDriving(enable_api_control);
+
+        if (car_controls.logWriter != null) {
+            car_controls.logWriter.flush();
+            car_controls.logWriter.close();
+        }
 
         System.out.println("[MyCar] End Bot! (JAVA), return_code = " + return_code);
 
