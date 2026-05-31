@@ -295,7 +295,7 @@ public class MyCar {
                                   "stuck_ticks,reverse_ticks,elapsed_ms");
                 lapStartTime = System.currentTimeMillis();
             } catch (IOException e) {
-                System.out.println("[LOG] Cannot open log: " + e.getMessage());
+                // log init failed silently
             }
         }
         if (logWriter != null) {
@@ -323,7 +323,7 @@ public class MyCar {
             if (lastProgress > 90f && sensing_info.lap_progress < 10f) {
                 lapCount++;
                 logWriter.printf("# LAP %d COMPLETE: %.2fs%n", lapCount, elapsed / 1000.0);
-                System.out.printf("[LOG] Lap %d: %.2fs%n", lapCount, elapsed / 1000.0);
+                System.out.printf("[LAP %d] %.2fs%n", lapCount, elapsed / 1000.0);
                 lapStartTime = System.currentTimeMillis();
             }
             lastProgress = sensing_info.lap_progress;
