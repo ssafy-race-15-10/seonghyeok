@@ -45,11 +45,11 @@ public class MyCar {
 
     static final TrackParams[] PARAMS = {
         // BASIC:  maxSpd  minSpd slow  stLA spLA  K1     K2     K3     decay  accR   brkR   K4     alpha
-        new TrackParams(130f, 40f, 0.8f,  5,  6, 0.45f, 0.20f, 0.35f, 0.4f, 30f, 40f, 0.25f, 0.40f),
+        new TrackParams(130f, 40f, 0.8f,  5,  6, 0.45f, 0.35f, 0.35f, 0.4f, 30f, 40f, 0.25f, 0.75f),
         // SPEED
-        new TrackParams(120f, 35f, 0.9f,  6,  7, 0.45f, 0.20f, 0.35f, 0.4f, 30f, 40f, 0.25f, 0.40f),
+        new TrackParams(120f, 35f, 0.9f,  6,  7, 0.45f, 0.35f, 0.35f, 0.4f, 30f, 40f, 0.25f, 0.75f),
         // SSAFY
-        new TrackParams(110f, 30f, 1.0f,  7,  8, 0.50f, 0.25f, 0.35f, 0.3f, 25f, 35f, 0.25f, 0.40f),
+        new TrackParams(110f, 30f, 1.0f,  7,  8, 0.50f, 0.25f, 0.35f, 0.3f, 25f, 35f, 0.25f, 0.75f),
         // GERMANY
         new TrackParams(100f, 25f, 1.2f,  8, 10, 0.55f, 0.25f, 0.40f, 0.5f, 20f, 30f, 0.30f, 0.35f)
     };
