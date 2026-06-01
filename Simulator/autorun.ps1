@@ -1,3 +1,6 @@
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 param(
     [int]$Runs    = 5,
     [int]$Warmup  = 3,
