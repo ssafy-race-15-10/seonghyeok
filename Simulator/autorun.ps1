@@ -1,7 +1,7 @@
 param(
     [int]$Runs    = 5,
     [int]$Warmup  = 8,
-    [int]$Cooldown = 6
+    [int]$Reset   = 3
 )
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -54,19 +54,23 @@ if ($build.ExitCode -ne 0) {
 }
 Write-Host "Build OK." -ForegroundColor Green
 
-# 실행 루프
+# Algo.exe 1회 시작
+Write-Host "Starting Algo.exe..." -ForegroundColor Yellow
+Stop-Process -Name "Algo" -Force -ErrorAction SilentlyContinue
+$algo = Start-Process -FilePath $AlgoExe `
+                      -ArgumentList "-ResX=640 -ResY=480 -windowed" `
+                      -PassThru
+Write-Host "Waiting ${Warmup}s for simulator to load..."
+Start-Sleep -Seconds $Warmup
+
+$wshell = New-Object -ComObject WScript.Shell
+
+# 실행 루프 — Algo.exe 재시작 없이 Backspace 리셋만 사용
 try {
     for ($i = 1; $i -le $Runs; $i++) {
         Write-Host "=== Run $i/$Runs ===" -ForegroundColor Cyan
-        Stop-Process -Name "Algo" -Force -ErrorAction SilentlyContinue
 
-        # 1. 시뮬레이터 시작
-        $algo = Start-Process -FilePath $AlgoExe `
-                              -ArgumentList "-ResX=640 -ResY=480 -windowed" `
-                              -PassThru
-        Start-Sleep -Seconds $Warmup
-
-        # 2. MyCar 실행 (종료될 때까지 대기)
+        # MyCar 실행 (종료될 때까지 대기)
         $java = Start-Process -FilePath $JavaExe `
                               -ArgumentList "-cp `"$OutDir`" -Djava.library.path=DrivingInterface MyCar" `
                               -WorkingDirectory $BotJavaDir `
@@ -76,14 +80,15 @@ try {
             Write-Warning "Run $i ended with non-zero exit code: $($java.ExitCode)"
         }
 
-        # 3. 시뮬레이터 종료 — 프로세스가 완전히 사라질 때까지 대기
-        Stop-Process -Name "Algo" -Force -ErrorAction SilentlyContinue
-        $waited = 0
-        while ((Get-Process -Name "Algo" -ErrorAction SilentlyContinue) -and $waited -lt 10) {
-            Start-Sleep -Seconds 1; $waited++
-        }
-        Write-Host "Algo stopped. Waiting ${Cooldown}s..."
-        Start-Sleep -Seconds $Cooldown
+        # 마지막 run이면 리셋 불필요
+        if ($i -eq $Runs) { break }
+
+        # Backspace로 시뮬레이터 리셋 (Algo.exe 재시작 없음)
+        Write-Host "Resetting simulator..."
+        $wshell.AppActivate($algo.Id) | Out-Null
+        Start-Sleep -Milliseconds 300
+        $wshell.SendKeys("{BACKSPACE}")
+        Start-Sleep -Seconds $Reset
     }
 } finally {
     Stop-Process -Name "Algo" -Force -ErrorAction SilentlyContinue
