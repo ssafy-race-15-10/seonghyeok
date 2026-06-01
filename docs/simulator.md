@@ -36,6 +36,22 @@ Pre-made presets are in `settings/`. Copy the desired file's contents to the pat
 - Multi (2-player): `runsv.bat` → launch each client in order
 - Multi car positions: Car1 `Y=−4`, Car2 `Y=4`
 
+## Autorun (반복 자동화)
+
+`Simulator/autorun.ps1`을 사용하면 Algo.exe + MyCar를 N번 자동 반복 실행한다.
+
+**사전 조건:** IntelliJ에서 MyCar를 빌드(컴파일)해 둘 것.
+
+```powershell
+# N번 반복 (기본값 5회, 워밍업 3초)
+PowerShell -ExecutionPolicy Bypass -File Simulator\autorun.ps1 -Runs 5
+
+# 파라미터 설명
+#   -Runs     반복 횟수 (기본 5)
+#   -Warmup   Algo 시작 후 대기 초 (기본 3)
+#   -Cooldown Algo 종료 후 대기 초 (기본 2)
+```
+
 ## Shortcuts
 
 | Key | Action |
