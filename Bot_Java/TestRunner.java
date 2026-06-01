@@ -87,9 +87,9 @@ public class TestRunner {
         System.out.println("  all-left maxed (clamped): " + s4);
 
         // EMA smoothing: prevSteering=0 → 출력은 alpha*raw 수준
-        // to_middle=9.25, angle=0, straight → centerError=-1, angleError=0, lookahead=0, dCenter=-1
-        // raw = K1*(-1)+K2*0+K3*0+K4*(-1) = -0.45+0-0-0.25 = -0.70
-        // steering = 0.4*(-0.70)+0.6*0 = -0.28
+        // angle=0·straight배열이므로 angleError=0, lookahead=0
+        // centerError=-1, dCenter=-1 → raw = 0.45*(-1)+0.20*0+0.35*0+0.25*(-1) = -0.70
+        // steering = 0.4*(-0.70) + 0.6*0 = -0.28
         float sEMA0 = MyCar.computeSteering(9.25f, 9.25f, 0f, straight, p, 0f, 0f);
         assertTrue(Math.abs(sEMA0 - (-0.28f)) < 0.01f,
                    "EMA from neutral: expected ~-0.28, got: " + sEMA0);
