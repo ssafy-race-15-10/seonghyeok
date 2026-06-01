@@ -8,34 +8,16 @@ param(
 )
 
 $AlgoExe    = "$PSScriptRoot\Algo.exe"
-$BotJavaDir = "$PSScriptRoot\..\Bot_Java"
+$BotJavaDir = Resolve-Path "$PSScriptRoot\..\Bot_Java"
+$OutDir     = "Build\Release"
 
 # 사전 확인
 if (-not (Test-Path $AlgoExe)) {
     Write-Error "Algo.exe not found: $AlgoExe"
     exit 1
 }
-if (-not (Test-Path $BotJavaDir)) {
-    Write-Error "Bot_Java directory not found: $BotJavaDir"
-    exit 1
-}
 
-# MyCar.class 위치 탐색
-$ClassPath = $null
-foreach ($cp in @("Build\Release", "out\production\Bot_Java", "out", ".")) {
-    if (Test-Path "$BotJavaDir\$cp\MyCar.class") {
-        $ClassPath = $cp
-        break
-    }
-}
-if (-not $ClassPath) {
-    Write-Error "MyCar.class를 찾을 수 없습니다. IntelliJ에서 빌드(Ctrl+F9)한 뒤 다시 실행하세요."
-    Write-Host "탐색 경로: $BotJavaDir\{Build\Release, out\production\Bot_Java, out, .}"
-    exit 1
-}
-Write-Host "Using classpath: $ClassPath"
-
-# java.exe 탐색 (PATH → JAVA_HOME → 일반 설치 경로 순)
+# java.exe / javac.exe 탐색 (PATH → JAVA_HOME → 일반 설치 경로 순)
 $JavaExe = "java"
 if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
     $candidates = @(
@@ -54,9 +36,25 @@ if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
         Write-Error "java.exe를 찾을 수 없습니다. JAVA_HOME 환경변수를 설정하거나 Java를 PATH에 추가하세요."
         exit 1
     }
-    Write-Host "Using java: $JavaExe"
 }
+$JavacExe = if ($JavaExe -eq "java") { "javac" } else { Join-Path (Split-Path $JavaExe) "javac.exe" }
+Write-Host "Using java : $JavaExe"
+Write-Host "Using javac: $JavacExe"
 
+# 빌드
+Write-Host "Building MyCar..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Path "$BotJavaDir\$OutDir" -Force | Out-Null
+$build = Start-Process -FilePath $JavacExe `
+                       -ArgumentList "-encoding UTF-8 -cp . -d `"$OutDir`" MyCar.java DrivingInterface\DrivingInterface.java" `
+                       -WorkingDirectory $BotJavaDir `
+                       -NoNewWindow -Wait -PassThru
+if ($build.ExitCode -ne 0) {
+    Write-Error "빌드 실패 (exit code $($build.ExitCode)). MyCar.java 컴파일 오류를 확인하세요."
+    exit 1
+}
+Write-Host "Build OK." -ForegroundColor Green
+
+# 실행 루프
 try {
     for ($i = 1; $i -le $Runs; $i++) {
         Write-Host "=== Run $i/$Runs ===" -ForegroundColor Cyan
@@ -70,11 +68,9 @@ try {
 
         # 2. MyCar 실행 (종료될 때까지 대기)
         $java = Start-Process -FilePath $JavaExe `
-                              -ArgumentList "-cp `"$ClassPath`" -Djava.library.path=DrivingInterface MyCar" `
+                              -ArgumentList "-cp `"$OutDir`" -Djava.library.path=DrivingInterface MyCar" `
                               -WorkingDirectory $BotJavaDir `
-                              -NoNewWindow `
-                              -Wait `
-                              -PassThru
+                              -NoNewWindow -Wait -PassThru
         Write-Host "Exit code: $($java.ExitCode)"
         if ($java.ExitCode -ne 0) {
             Write-Warning "Run $i ended with non-zero exit code: $($java.ExitCode)"
