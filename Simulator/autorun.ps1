@@ -17,6 +17,28 @@ if (-not (Test-Path $BotJavaDir)) {
     exit 1
 }
 
+# java.exe 탐색 (PATH → JAVA_HOME → 일반 설치 경로 순)
+$JavaExe = "java"
+if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
+    $candidates = @(
+        "$env:JAVA_HOME\bin\java.exe",
+        "C:\Program Files\Java\jdk*\bin\java.exe",
+        "C:\Program Files\Eclipse Adoptium\*\bin\java.exe",
+        "C:\Program Files\Microsoft\jdk*\bin\java.exe",
+        "C:\Program Files\JetBrains\*\jbr\bin\java.exe"
+    )
+    $found = $null
+    foreach ($pattern in $candidates) {
+        $found = Get-Item $pattern -ErrorAction SilentlyContinue | Select-Object -Last 1
+        if ($found) { $JavaExe = $found.FullName; break }
+    }
+    if (-not $found) {
+        Write-Error "java.exe를 찾을 수 없습니다. JAVA_HOME 환경변수를 설정하거나 Java를 PATH에 추가하세요."
+        exit 1
+    }
+    Write-Host "Using java: $JavaExe"
+}
+
 try {
     for ($i = 1; $i -le $Runs; $i++) {
         Write-Host "=== Run $i/$Runs ===" -ForegroundColor Cyan
@@ -29,7 +51,7 @@ try {
         Start-Sleep -Seconds $Warmup
 
         # 2. MyCar 실행 (종료될 때까지 대기)
-        $java = Start-Process -FilePath "java" `
+        $java = Start-Process -FilePath $JavaExe `
                               -ArgumentList "-cp .;DrivingInterface -Djava.library.path=DrivingInterface MyCar" `
                               -WorkingDirectory $BotJavaDir `
                               -NoNewWindow `
