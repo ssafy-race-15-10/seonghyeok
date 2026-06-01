@@ -52,7 +52,7 @@ try {
 
         # 2. MyCar 실행 (종료될 때까지 대기)
         $java = Start-Process -FilePath $JavaExe `
-                              -ArgumentList "-cp .;DrivingInterface -Djava.library.path=DrivingInterface MyCar" `
+                              -ArgumentList "-cp `"Build\Release`" -Djava.library.path=DrivingInterface MyCar" `
                               -WorkingDirectory $BotJavaDir `
                               -NoNewWindow `
                               -Wait `
