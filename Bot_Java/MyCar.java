@@ -259,6 +259,7 @@ public class MyCar {
 
         float speedCap    = computeObstacleSpeedCap(sensing_info.track_forward_obstacles, p.maxSpeed);
         float targetSpeed = Math.min(computeTargetSpeed(angles, p), speedCap);
+        if (Math.abs(centerError) > 0.8f) targetSpeed = Math.min(targetSpeed, 0.4f * p.maxSpeed);
         applySpeedControl(sensing_info.speed, targetSpeed, p);
         float nearestDist = nearestObstacleDist(sensing_info.track_forward_obstacles);
 
@@ -278,7 +279,7 @@ public class MyCar {
         } else {
             // EMA 상태 갱신 (avoidSteer 전 순수 PD 출력을 저장)
             prevSteering    = baseSteer;
-            prevCenterError = centerError;
+            prevCenterError = clamp(centerError, -1.0f, 1.0f);
 
             if (sensing_info.lap_progress > 1f && isStuck(sensing_info.speed, car_controls.throttle)) {
                 stuckTicks++;
