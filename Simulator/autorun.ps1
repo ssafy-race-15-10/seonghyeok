@@ -17,6 +17,21 @@ if (-not (Test-Path $BotJavaDir)) {
     exit 1
 }
 
+# MyCar.class 위치 탐색
+$ClassPath = $null
+foreach ($cp in @("Build\Release", "out\production\Bot_Java", "out", ".")) {
+    if (Test-Path "$BotJavaDir\$cp\MyCar.class") {
+        $ClassPath = $cp
+        break
+    }
+}
+if (-not $ClassPath) {
+    Write-Error "MyCar.class를 찾을 수 없습니다. IntelliJ에서 빌드(Ctrl+F9)한 뒤 다시 실행하세요."
+    Write-Host "탐색 경로: $BotJavaDir\{Build\Release, out\production\Bot_Java, out, .}"
+    exit 1
+}
+Write-Host "Using classpath: $ClassPath"
+
 # java.exe 탐색 (PATH → JAVA_HOME → 일반 설치 경로 순)
 $JavaExe = "java"
 if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
@@ -52,7 +67,7 @@ try {
 
         # 2. MyCar 실행 (종료될 때까지 대기)
         $java = Start-Process -FilePath $JavaExe `
-                              -ArgumentList "-cp `"Build\Release`" -Djava.library.path=DrivingInterface MyCar" `
+                              -ArgumentList "-cp `"$ClassPath`" -Djava.library.path=DrivingInterface MyCar" `
                               -WorkingDirectory $BotJavaDir `
                               -NoNewWindow `
                               -Wait `
