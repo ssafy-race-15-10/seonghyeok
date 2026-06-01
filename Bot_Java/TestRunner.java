@@ -13,40 +13,29 @@ public class TestRunner {
 
     static void testTrackParams() {
         MyCar.TrackParams basic = MyCar.PARAMS[MyCar.TRACK_BASIC];
-        assertTrue(basic.maxSpeed == 130f,        "BASIC maxSpeed");
-        assertTrue(basic.minSpeed == 40f,         "BASIC minSpeed");
-        assertTrue(basic.slowdownFactor == 0.8f,  "BASIC slowdownFactor");
-        assertTrue(basic.steerLookAhead == 5,     "BASIC steerLookAhead");
-        assertTrue(basic.speedLookAhead == 6,     "BASIC speedLookAhead");
-        assertTrue(basic.K1 == 0.45f,            "BASIC K1");
-        assertTrue(basic.K4 == 0.25f,            "BASIC K4");
-        assertTrue(basic.alpha == 0.75f,         "BASIC alpha");
-        assertTrue(basic.brakeRange == 40f,       "BASIC brakeRange");
+        assertTrue(basic.maxSpeed == 130f,         "BASIC maxSpeed");
+        assertTrue(basic.minSpeed == 40f,          "BASIC minSpeed");
+        assertTrue(basic.slowdownFactor == 0.8f,   "BASIC slowdownFactor");
+        assertTrue(basic.steerLookAhead == 5,      "BASIC steerLookAhead");
+        assertTrue(basic.speedLookAhead == 6,      "BASIC speedLookAhead");
+        assertTrue(basic.K_stanley == 3.0f,        "BASIC K_stanley");
+        assertTrue(basic.K3 == 0.35f,             "BASIC K3");
+        assertTrue(basic.brakeRange == 40f,        "BASIC brakeRange");
 
         MyCar.TrackParams speed = MyCar.PARAMS[MyCar.TRACK_SPEED];
-        assertTrue(speed.maxSpeed == 120f,        "SPEED maxSpeed");
-        assertTrue(speed.slowdownFactor == 0.9f,  "SPEED slowdownFactor");
-        assertTrue(speed.steerLookAhead == 6,     "SPEED steerLookAhead");
-        assertTrue(speed.K2 == 0.35f,            "SPEED K2");
-        assertTrue(speed.K4 == 0.25f,            "SPEED K4");
-        assertTrue(speed.alpha == 0.75f,         "SPEED alpha");
+        assertTrue(speed.maxSpeed == 120f,         "SPEED maxSpeed");
+        assertTrue(speed.K_stanley == 2.5f,        "SPEED K_stanley");
 
         MyCar.TrackParams ssafy = MyCar.PARAMS[MyCar.TRACK_SSAFY];
-        assertTrue(ssafy.maxSpeed == 110f,        "SSAFY maxSpeed");
-        assertTrue(ssafy.slowdownFactor == 1.0f,  "SSAFY slowdownFactor");
-        assertTrue(ssafy.decayFactor == 0.3f,    "SSAFY decayFactor");
-        assertTrue(ssafy.accelerationRange == 25f,"SSAFY accelerationRange");
-        assertTrue(ssafy.K4 == 0.25f,           "SSAFY K4");
-        assertTrue(ssafy.alpha == 0.75f,        "SSAFY alpha");
+        assertTrue(ssafy.maxSpeed == 110f,         "SSAFY maxSpeed");
+        assertTrue(ssafy.decayFactor == 0.3f,      "SSAFY decayFactor");
+        assertTrue(ssafy.K_stanley == 2.0f,        "SSAFY K_stanley");
 
         MyCar.TrackParams germany = MyCar.PARAMS[MyCar.TRACK_GERMANY];
-        assertTrue(germany.maxSpeed == 100f,      "GERMANY maxSpeed");
-        assertTrue(germany.steerLookAhead == 8,   "GERMANY steerLookAhead");
-        assertTrue(germany.speedLookAhead == 10,  "GERMANY speedLookAhead");
-        assertTrue(germany.K3 == 0.40f,          "GERMANY K3");
-        assertTrue(germany.brakeRange == 30f,     "GERMANY brakeRange");
-        assertTrue(germany.K4 == 0.30f,          "GERMANY K4");
-        assertTrue(germany.alpha == 0.35f,       "GERMANY alpha");
+        assertTrue(germany.maxSpeed == 100f,       "GERMANY maxSpeed");
+        assertTrue(germany.K3 == 0.40f,           "GERMANY K3");
+        assertTrue(germany.K_stanley == 3.5f,      "GERMANY K_stanley");
+        assertTrue(germany.brakeRange == 30f,      "GERMANY brakeRange");
 
         System.out.println("PASS: TrackParams");
     }
@@ -55,73 +44,52 @@ public class TestRunner {
         MyCar.TrackParams p = MyCar.PARAMS[MyCar.TRACK_BASIC];
         float[] straight = new float[20];
 
-        // s1: 중앙 정렬, 직선 → 거의 0
-        float s1 = MyCar.computeSteering(0f, 9.25f, 0f, straight, p, 0f, 0f);
-        assertTrue(Math.abs(s1) < 0.05f,
-                   "Centered car on straight should steer ~0, got: " + s1);
+        // s1: 중앙 정렬, 직선 → 0
+        float s1 = MyCar.computeSteering(0f, 9.25f, 0f, 10f, straight, p);
+        assertTrue(Math.abs(s1) < 0.001f,
+                   "Centered car on straight should steer 0, got: " + s1);
         System.out.println("  straight+centered: " + s1);
 
-        // s2: 오른쪽 이탈 → 음수(왼쪽 보정)
-        float s2 = MyCar.computeSteering(5f, 9.25f, 0f, straight, p, 0f, 0f);
+        // s2: 오른쪽 5m 이탈, 36km/h → 음수 (왼쪽 보정)
+        // centering = -atan(3.0*5/10.0)/(π/2) = -0.626
+        float s2 = MyCar.computeSteering(5f, 9.25f, 0f, 36f, straight, p);
         assertTrue(s2 < 0,
-                   "Car right of center should steer left (negative), got: " + s2);
+                   "Car right of center should steer left, got: " + s2);
+        assertTrue(Math.abs(s2 - (-0.626f)) < 0.01f,
+                   "Right 5m at 36km/h: expected ~-0.626, got: " + s2);
         System.out.println("  right of center:   " + s2);
 
         // s3: 전방 우커브 → 양수
         float[] rightCurve = new float[20];
         for (int i = 0; i < 5; i++) rightCurve[i] = 30f;
-        float s3 = MyCar.computeSteering(0f, 9.25f, 0f, rightCurve, p, 0f, 0f);
+        float s3 = MyCar.computeSteering(0f, 9.25f, 0f, 36f, rightCurve, p);
         assertTrue(s3 > 0,
-                   "Right curve ahead should steer right (positive), got: " + s3);
+                   "Right curve ahead should steer right, got: " + s3);
         System.out.println("  right curve ahead: " + s3);
 
-        // s4: 좌측 최대 이탈(현재) + 이전 틱은 우측 최대 이탈 → dCenter=-2, raw=-1.65→clamp-1.0
-        // centerError=-1, prevCenterError=1 → dCenter=-2
-        // raw = K1*(-1)+K2*(-1)+K3*(-1)+K4*(-2) = -0.45-0.35-0.35-0.50 = -1.65 → clamp -1.0
-        // steering = 0.75*(-1)+0.25*(-1) = -1.0
+        // s4: 차체 30도 기울어짐(오른쪽), 중앙, 직선 → 음수 (heading 보정)
+        // heading = -(30/90) = -0.333
+        float s4 = MyCar.computeSteering(0f, 9.25f, 30f, 36f, straight, p);
+        assertTrue(s4 < 0,
+                   "Car pointing right should steer left to correct heading, got: " + s4);
+        assertTrue(Math.abs(s4 - (-0.333f)) < 0.01f,
+                   "Heading 30deg: expected ~-0.333, got: " + s4);
+        System.out.println("  heading correction: " + s4);
+
+        // s5: Stanley 속도 적응성 — 같은 위치, 저속일수록 보정 강함
+        float sLow  = MyCar.computeSteering(5f, 9.25f, 0f, 20f,  straight, p);
+        float sHigh = MyCar.computeSteering(5f, 9.25f, 0f, 100f, straight, p);
+        assertTrue(Math.abs(sLow) > Math.abs(sHigh),
+                   "Lower speed should give stronger centering: low=" + sLow + " high=" + sHigh);
+        System.out.println("  speed-adaptive (20km/h):" + sLow + "  (100km/h):" + sHigh);
+
+        // s6: 모든 신호 최대 왼쪽 → 클램프 -1.0
         float[] leftCurve90 = new float[20];
         for (int i = 0; i < 5; i++) leftCurve90[i] = -90f;
-        float s4 = MyCar.computeSteering(9.25f, 9.25f, 90f, leftCurve90, p, 1.0f, -1.0f);
-        assertTrue(Math.abs(s4 - (-1.0f)) < 0.001f,
-                   "All signals maxed left should yield -1.0, got: " + s4);
-        System.out.println("  all-left maxed (clamped): " + s4);
-
-        // EMA smoothing: prevSteering=0 → 출력은 alpha*raw 수준
-        // angle=0·straight배열이므로 angleError=0, lookahead=0
-        // centerError=-1, dCenter=-1 → raw = 0.45*(-1)+0.35*0+0.35*0+0.25*(-1) = -0.70
-        // steering = 0.75*(-0.70) + 0.25*0 = -0.525
-        float sEMA0 = MyCar.computeSteering(9.25f, 9.25f, 0f, straight, p, 0f, 0f);
-        assertTrue(Math.abs(sEMA0 - (-0.525f)) < 0.01f,
-                   "EMA from neutral: expected ~-0.525, got: " + sEMA0);
-        System.out.println("  EMA from neutral:  " + sEMA0);
-
-        // EMA smoothing: prevSteering=-0.8 → 더 음수
-        // steering=0.75*(-0.70)+0.25*(-0.8)=-0.525-0.20=-0.725
-        float sEMA1 = MyCar.computeSteering(9.25f, 9.25f, 0f, straight, p, 0f, -0.8f);
-        assertTrue(Math.abs(sEMA1 - (-0.725f)) < 0.01f,
-                   "EMA with prev=-0.8: expected ~-0.725, got: " + sEMA1);
-        assertTrue(sEMA1 < sEMA0,
-                   "EMA: prev steering magnifies output, got sEMA0=" + sEMA0 + " sEMA1=" + sEMA1);
-        System.out.println("  EMA with prev=-0.8: " + sEMA1);
-
-        // D-term: 이탈 속도 빠를수록 보정 강화
-        // prevCenterError=0 → dCenter=-1.0: raw=-0.45-0.25=-0.70, steering=0.75*(-0.70)=-0.525
-        // prevCenterError=-0.5 → dCenter=-0.5: raw=-0.45-0.125=-0.575, steering=0.75*(-0.575)=-0.43125
-        float sDterm0 = MyCar.computeSteering(9.25f, 9.25f, 0f, straight, p, 0f, 0f);
-        float sDterm1 = MyCar.computeSteering(9.25f, 9.25f, 0f, straight, p, -0.5f, 0f);
-        assertTrue(sDterm0 < sDterm1,
-                   "D-term more aggressive when dCenter is large: sDterm0=" + sDterm0 + " sDterm1=" + sDterm1);
-        System.out.println("  D-term dCenter=-1.0: " + sDterm0 + "  dCenter=-0.5: " + sDterm1);
-
-        // D-term: 복귀 중이면 오버슈팅 억제
-        // prevCenterError=-1.0, now=0 → dCenter=+1.0
-        // raw=0.25*1.0=0.25, steering=0.75*0.25+0.25*(-0.4)=0.1875-0.10=0.0875
-        // 비교: prevCenterError=0, dCenter=0, raw=0, steering=0.75*0+0.25*(-0.4)=-0.10
-        float sDterm2 = MyCar.computeSteering(0f, 9.25f, 0f, straight, p, -1.0f, -0.4f);
-        float sDterm3 = MyCar.computeSteering(0f, 9.25f, 0f, straight, p, 0f, -0.4f);
-        assertTrue(sDterm2 > sDterm3,
-                   "D-term reduces overcorrection when returning: sDterm2=" + sDterm2 + " sDterm3=" + sDterm3);
-        System.out.println("  D-term anti-overshoot: " + sDterm2 + " vs no-D: " + sDterm3);
+        float s6 = MyCar.computeSteering(9.25f, 9.25f, 90f, 36f, leftCurve90, p);
+        assertTrue(Math.abs(s6 - (-1.0f)) < 0.001f,
+                   "All signals maxed left should clamp to -1.0, got: " + s6);
+        System.out.println("  all-left maxed (clamped): " + s6);
 
         System.out.println("PASS: steering");
     }

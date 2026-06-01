@@ -17,41 +17,36 @@ public class MyCar {
     // --- TrackParams inner class ---
     static class TrackParams {
         final float maxSpeed, minSpeed, slowdownFactor;
-        final float K1, K2, K3, decayFactor;
+        final float K_stanley, K3, decayFactor;
         final float accelerationRange, brakeRange;
         final int steerLookAhead, speedLookAhead;
-        final float K4, alpha;
 
         TrackParams(float maxSpeed, float minSpeed, float slowdownFactor,
                     int steerLookAhead, int speedLookAhead,
-                    float K1, float K2, float K3, float decayFactor,
-                    float accelerationRange, float brakeRange,
-                    float K4, float alpha) {
+                    float K_stanley, float K3, float decayFactor,
+                    float accelerationRange, float brakeRange) {
             this.maxSpeed          = maxSpeed;
             this.minSpeed          = minSpeed;
             this.slowdownFactor    = slowdownFactor;
             this.steerLookAhead    = steerLookAhead;
             this.speedLookAhead    = speedLookAhead;
-            this.K1                = K1;
-            this.K2                = K2;
+            this.K_stanley         = K_stanley;
             this.K3                = K3;
             this.decayFactor       = decayFactor;
             this.accelerationRange = accelerationRange;
             this.brakeRange        = brakeRange;
-            this.K4                = K4;
-            this.alpha             = alpha;
         }
     }
 
     static final TrackParams[] PARAMS = {
-        // BASIC:  maxSpd  minSpd slow  stLA spLA  K1     K2     K3     decay  accR   brkR   K4     alpha
-        new TrackParams(130f, 40f, 0.8f,  5,  6, 0.45f, 0.35f, 0.35f, 0.4f, 30f, 40f, 0.25f, 0.75f),
+        // BASIC:   maxSpd  minSpd slow  stLA spLA  Kstan  K3    decay  accR  brkR
+        new TrackParams(130f, 40f, 0.8f,  5,  6, 3.0f, 0.35f, 0.4f, 30f, 40f),
         // SPEED
-        new TrackParams(120f, 35f, 0.9f,  6,  7, 0.45f, 0.35f, 0.35f, 0.4f, 30f, 40f, 0.25f, 0.75f),
+        new TrackParams(120f, 35f, 0.9f,  6,  7, 2.5f, 0.35f, 0.4f, 30f, 40f),
         // SSAFY
-        new TrackParams(110f, 30f, 1.0f,  7,  8, 0.50f, 0.25f, 0.35f, 0.3f, 25f, 35f, 0.25f, 0.75f),
+        new TrackParams(110f, 30f, 1.0f,  7,  8, 2.0f, 0.35f, 0.3f, 25f, 35f),
         // GERMANY
-        new TrackParams(100f, 25f, 1.2f,  8, 10, 0.55f, 0.25f, 0.40f, 0.5f, 20f, 30f, 0.30f, 0.35f)
+        new TrackParams(100f, 25f, 1.2f,  8, 10, 3.5f, 0.40f, 0.5f, 20f, 30f)
     };
 
     // --- Steering helpers ---
@@ -66,17 +61,15 @@ public class MyCar {
         return wSum == 0 ? 0f : (float) (aSum / wSum / 90.0);
     }
 
+    // Stanley controller: heading error + speed-adaptive cross-track correction + lookahead
     static float computeSteering(float toMiddle, float halfRoadLimit,
-                                  float movingAngle, float[] angles,
-                                  TrackParams p,
-                                  float prevCenterError, float prevSteering) {
-        float centerError    = -(toMiddle / halfRoadLimit);
-        float angleError     = -(movingAngle / 90.0f);
-        float lookaheadAngle = computeLookaheadAngle(angles, p);
-        float dCenter        = centerError - prevCenterError;
-        float raw = p.K1 * centerError + p.K2 * angleError
-                  + p.K3 * lookaheadAngle + p.K4 * dCenter;
-        return clamp(p.alpha * raw + (1f - p.alpha) * prevSteering, -1.0f, 1.0f);
+                                  float movingAngle, float speed,
+                                  float[] angles, TrackParams p) {
+        float heading   = -(movingAngle / 90.0f);
+        float speedMs   = Math.max(speed / 3.6f, 3.0f);
+        float centering = -(float)(Math.atan(p.K_stanley * toMiddle / speedMs) / (Math.PI / 2.0));
+        float lookahead = computeLookaheadAngle(angles, p);
+        return clamp(heading + centering + p.K3 * lookahead, -1.0f, 1.0f);
     }
 
     static float clamp(float v, float min, float max) {
@@ -163,8 +156,6 @@ public class MyCar {
     private int trackType = TRACK_BASIC;
     private int stuckTicks   = 0;
     private int reverseTicks = 0;
-    private float prevCenterError = 0f;
-    private float prevSteering    = 0f;
 
     // --- Lap logger ---
     PrintWriter logWriter = null;
@@ -247,8 +238,8 @@ public class MyCar {
             sensing_info.to_middle,
             sensing_info.half_road_limit,
             sensing_info.moving_angle,
-            angles, p,
-            prevCenterError, prevSteering
+            sensing_info.speed,
+            angles, p
         );
         car_controls.steering = baseSteer;
 
@@ -275,12 +266,7 @@ public class MyCar {
                 System.out.printf("[REVERSE] DONE at progress=%.1f%n", sensing_info.lap_progress);
                 logEvent(String.format("# REVERSE DONE at progress=%.1f", sensing_info.lap_progress));
             }
-            // 역방향 중: EMA 상태 갱신 건너뜀 (후진 steering이 정상 주행 EMA를 오염하지 않도록)
         } else {
-            // EMA 상태 갱신 (avoidSteer 전 순수 PD 출력을 저장)
-            prevSteering    = baseSteer;
-            prevCenterError = clamp(centerError, -1.0f, 1.0f);
-
             if (sensing_info.lap_progress > 1f && isStuck(sensing_info.speed, car_controls.throttle)) {
                 stuckTicks++;
                 if (stuckTicks == 5) {
