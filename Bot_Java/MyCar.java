@@ -243,13 +243,14 @@ public class MyCar {
         float[] angles = toFloatArray(sensing_info.track_forward_angles);
 
         float centerError = -(sensing_info.to_middle / sensing_info.half_road_limit);
-        car_controls.steering = computeSteering(
+        float baseSteer = computeSteering(
             sensing_info.to_middle,
             sensing_info.half_road_limit,
             sensing_info.moving_angle,
             angles, p,
             prevCenterError, prevSteering
         );
+        car_controls.steering = baseSteer;
 
         // Obstacle avoidance: blend avoidance signal into steering
         float avoidSteer = computeObstacleAvoidance(sensing_info.track_forward_obstacles,
@@ -275,8 +276,8 @@ public class MyCar {
             }
             // 역방향 중: EMA 상태 갱신 건너뜀 (후진 steering이 정상 주행 EMA를 오염하지 않도록)
         } else {
-            // EMA 상태 갱신
-            prevSteering    = car_controls.steering;
+            // EMA 상태 갱신 (avoidSteer 전 순수 PD 출력을 저장)
+            prevSteering    = baseSteer;
             prevCenterError = centerError;
 
             if (sensing_info.lap_progress > 1f && isStuck(sensing_info.speed, car_controls.throttle)) {
