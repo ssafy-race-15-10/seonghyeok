@@ -75,9 +75,10 @@ public class TestRunner {
                    "Right curve ahead should steer right (positive), got: " + s3);
         System.out.println("  right curve ahead: " + s3);
 
-        // s4: 모든 신호 최대 좌측 + prevSteering=-1.0 → -1.0 (클램프)
-        // centerError=-1, dCenter=-1-1=-2, raw=-0.45-0.20-0.35+0.25*(-2)=-1.5 → clamp -1
-        // steering=0.4*(-1)+0.6*(-1)=-1.0
+        // s4: 좌측 최대 이탈(현재) + 이전 틱은 우측 최대 이탈 → dCenter=-2, raw=-1.5→clamp-1.0
+        // centerError=-1, prevCenterError=1 → dCenter=-2
+        // raw = K1*(-1)+K2*(-1)+K3*(-1)+K4*(-2) = -0.45-0.20-0.35-0.50 = -1.5 → clamp -1.0
+        // steering = 0.4*(-1)+0.6*(-1) = -1.0
         float[] leftCurve90 = new float[20];
         for (int i = 0; i < 5; i++) leftCurve90[i] = -90f;
         float s4 = MyCar.computeSteering(9.25f, 9.25f, 90f, leftCurve90, p, 1.0f, -1.0f);
@@ -86,8 +87,9 @@ public class TestRunner {
         System.out.println("  all-left maxed (clamped): " + s4);
 
         // EMA smoothing: prevSteering=0 → 출력은 alpha*raw 수준
-        // to_middle=9.25, straight → centerError=-1, dCenter=-1, raw=-0.45-0.25=-0.70
-        // steering=0.4*(-0.70)+0.6*0=-0.28
+        // to_middle=9.25, angle=0, straight → centerError=-1, angleError=0, lookahead=0, dCenter=-1
+        // raw = K1*(-1)+K2*0+K3*0+K4*(-1) = -0.45+0-0-0.25 = -0.70
+        // steering = 0.4*(-0.70)+0.6*0 = -0.28
         float sEMA0 = MyCar.computeSteering(9.25f, 9.25f, 0f, straight, p, 0f, 0f);
         assertTrue(Math.abs(sEMA0 - (-0.28f)) < 0.01f,
                    "EMA from neutral: expected ~-0.28, got: " + sEMA0);
