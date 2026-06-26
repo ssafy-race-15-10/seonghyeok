@@ -16,6 +16,15 @@
 # Build output
 Build/
 
+# Terraform local state/cache
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+
 # Simulator binaries (large, Windows-only)
 Simulator/*
 !Simulator/*.ps1
