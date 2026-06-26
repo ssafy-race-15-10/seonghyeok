@@ -1,0 +1,127 @@
+name: Deploy Windows Code
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Windows host public IP or DNS name. Defaults to secret WINDOWS_HOST."
+        required: false
+        type: string
+  push:
+    branches:
+      - master
+    paths:
+      - "Bot_Java/MyCar.java"
+      - "Bot_Java/TestRunner.java"
+      - "Bot_Java/DrivingInterface/**"
+      - ".github/workflows/deploy-windows-code.yml"
+
+concurrency:
+  group: deploy-windows-code
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      WINDOWS_USER: Administrator
+      REMOTE_DIR: C:/ssafy-race/Bot_Java
+      AWS_REGION: ap-northeast-2
+      SECURITY_GROUP_NAME: ssafy-race-windows-t3-sg
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Allow runner SSH access
+        id: ssh_access
+        run: |
+          set -euo pipefail
+          runner_cidr="$(curl -fsS https://checkip.amazonaws.com | tr -d '[:space:]')/32"
+          security_group_id="$(
+            aws ec2 describe-security-groups \
+              --filters "Name=group-name,Values=$SECURITY_GROUP_NAME" \
+              --query 'SecurityGroups[0].GroupId' \
+              --output text
+          )"
+          if [ -z "$security_group_id" ] || [ "$security_group_id" = "None" ]; then
+            echo "security group not found: $SECURITY_GROUP_NAME" >&2
+            exit 1
+          fi
+          aws ec2 authorize-security-group-ingress \
+            --group-id "$security_group_id" \
+            --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=$runner_cidr,Description='GitHub Actions deploy'}]" \
+            || true
+          echo "runner_cidr=$runner_cidr" >> "$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve target
+        id: target
+        env:
+          INPUT_HOST: ${{ inputs.host }}
+          SECRET_HOST: ${{ secrets.WINDOWS_HOST }}
+        run: |
+          set -euo pipefail
+          host="${INPUT_HOST:-$SECRET_HOST}"
+          if [ -z "$host" ]; then
+            echo "WINDOWS_HOST secret or workflow_dispatch host input is required" >&2
+            exit 1
+          fi
+          echo "host=$host" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH key
+        env:
+          WINDOWS_SSH_PRIVATE_KEY: ${{ secrets.WINDOWS_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$WINDOWS_SSH_PRIVATE_KEY" ]; then
+            echo "WINDOWS_SSH_PRIVATE_KEY secret is required" >&2
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$WINDOWS_SSH_PRIVATE_KEY" > ~/.ssh/aws-windows
+          chmod 600 ~/.ssh/aws-windows
+          ssh-keyscan -H "${{ steps.target.outputs.host }}" >> ~/.ssh/known_hosts
+
+      - name: Prepare remote directory
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/aws-windows "$WINDOWS_USER@${{ steps.target.outputs.host }}" \
+            "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force '$REMOTE_DIR' | Out-Null\""
+
+      - name: Copy Java sources
+        run: |
+          set -euo pipefail
+          scp -i ~/.ssh/aws-windows \
+            Bot_Java/MyCar.java \
+            Bot_Java/TestRunner.java \
+            "$WINDOWS_USER@${{ steps.target.outputs.host }}:$REMOTE_DIR/"
+          scp -i ~/.ssh/aws-windows -r \
+            Bot_Java/DrivingInterface \
+            "$WINDOWS_USER@${{ steps.target.outputs.host }}:$REMOTE_DIR/"
+
+      - name: Compile if JDK is installed
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/aws-windows "$WINDOWS_USER@${{ steps.target.outputs.host }}" \
+            "powershell -NoProfile -Command \"cd '$REMOTE_DIR'; if (Get-Command javac -ErrorAction SilentlyContinue) { javac MyCar.java TestRunner.java; Write-Host 'Java compile OK' } else { Write-Host 'javac not found; copied files only' }\""
+
+      - name: Revoke runner SSH access
+        if: always() && steps.ssh_access.outputs.security_group_id != ''
+        run: |
+          set -euo pipefail
+          aws ec2 revoke-security-group-ingress \
+            --group-id "${{ steps.ssh_access.outputs.security_group_id }}" \
+            --protocol tcp \
+            --port 22 \
+            --cidr "${{ steps.ssh_access.outputs.runner_cidr }}" \
+            || true

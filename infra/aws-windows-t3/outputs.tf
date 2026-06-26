@@ -8,6 +8,16 @@ output "rdp_target" {
   value       = "${aws_instance.windows.public_ip}:3389"
 }
 
+output "ssh_target" {
+  description = "SSH target for code deployment."
+  value       = "Administrator@${aws_instance.windows.public_ip}"
+}
+
+output "security_group_id" {
+  description = "Security group ID for temporary CI ingress rules."
+  value       = aws_security_group.windows.id
+}
+
 output "airsim_rpc_target" {
   description = "AirSim RPC target for tools/airsim_rpc_probe.py."
   value       = "${aws_instance.windows.public_ip}:41451"

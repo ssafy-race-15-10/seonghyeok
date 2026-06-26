@@ -11,9 +11,9 @@ variable "name" {
 }
 
 variable "instance_type" {
-  description = "Windows test instance type. t3.large is a low-cost experiment and may not run the simulator."
+  description = "Windows test instance type. t3.small is free-tier eligible in the current account but may not run the simulator well."
   type        = string
-  default     = "t3.large"
+  default     = "t3.small"
 }
 
 variable "operator_cidr" {
@@ -37,5 +37,5 @@ variable "public_key_path" {
 variable "root_volume_size_gb" {
   description = "Root EBS volume size in GiB."
   type        = number
-  default     = 100
+  default     = 30
 }

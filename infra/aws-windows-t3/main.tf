@@ -31,11 +31,12 @@ data "http" "operator_ip" {
 
 locals {
   operator_cidr = coalesce(var.operator_cidr, "${chomp(data.http.operator_ip.response_body)}/32")
+  public_key    = trimspace(file(pathexpand(var.public_key_path)))
 }
 
 resource "aws_key_pair" "windows" {
   key_name   = var.key_name
-  public_key = file(var.public_key_path)
+  public_key = local.public_key
 }
 
 resource "aws_security_group" "windows" {
@@ -55,6 +56,14 @@ resource "aws_security_group" "windows" {
     description = "AirSim RPC from operator IP"
     from_port   = 41451
     to_port     = 41451
+    protocol    = "tcp"
+    cidr_blocks = [local.operator_cidr]
+  }
+
+  ingress {
+    description = "SSH from operator IP for code deploy"
+    from_port   = 22
+    to_port     = 22
     protocol    = "tcp"
     cidr_blocks = [local.operator_cidr]
   }
@@ -82,7 +91,20 @@ resource "aws_instance" "windows" {
 
   user_data = <<-POWERSHELL
     <powershell>
+    $ErrorActionPreference = "Stop"
     New-NetFirewallRule -DisplayName "AirSim RPC 41451" -Direction Inbound -Protocol TCP -LocalPort 41451 -Action Allow
+
+    Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+    Start-Service sshd
+    Set-Service -Name sshd -StartupType Automatic
+
+    $sshDir = "C:\ProgramData\ssh"
+    New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
+    Set-Content -Path "$sshDir\administrators_authorized_keys" -Value "${local.public_key}"
+    icacls "$sshDir\administrators_authorized_keys" /inheritance:r /grant "Administrators:F" /grant "SYSTEM:F"
+
+    New-NetFirewallRule -DisplayName "OpenSSH Server 22" -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow
+    New-Item -ItemType Directory -Force -Path "C:\ssafy-race\Bot_Java" | Out-Null
     </powershell>
   POWERSHELL
 
